@@ -195,3 +195,5 @@ def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:
     server.login(sender, password)
     server.sendmail(sender, [receiver], msg.as_string())
     server.quit()
+
+    os.system('rm temp/*')
