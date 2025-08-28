@@ -3,11 +3,15 @@ import math
 from tqdm import tqdm
 from email.header import Header
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from email.utils import parseaddr, formataddr
 import smtplib
 import datetime
 import time
 from loguru import logger
+import os
+import requests
 
 framework = """
 <!DOCTYPE HTML>
@@ -90,13 +94,6 @@ def get_block_html(title:str, authors:str, rate:str,arxiv_id:str, abstract:str, 
             <strong>TLDR:</strong> {abstract}
         </td>
     </tr>
-
-    <tr>
-        <td style="padding: 8px 0;">
-            <a href="{pdf_url}" style="display: inline-block; text-decoration: none; font-size: 14px; font-weight: bold; color: #fff; background-color: #d9534f; padding: 8px 16px; border-radius: 4px;">PDF</a>
-            {code}
-        </td>
-    </tr>
 </table>
 """
     return block_template.format(title=title, authors=authors,rate=rate,arxiv_id=arxiv_id, abstract=abstract, pdf_url=pdf_url, code=code, affiliations=affiliations)
@@ -119,7 +116,7 @@ def get_stars(score:float):
 
 
 def render_email(papers:list[ArxivPaper]):
-    parts = []
+    parts, pdfs = [], []
     if len(papers) == 0 :
         return framework.replace('__CONTENT__', get_empty_html())
     
@@ -140,21 +137,52 @@ def render_email(papers:list[ArxivPaper]):
         else:
             affiliations = 'Unknown Affiliation'
         parts.append(get_block_html(p.title, authors,rate,p.arxiv_id ,p.tldr, p.pdf_url, p.code_url, affiliations))
+
+        os.makedirs('temp', exist_ok=True)
+        filepath = os.path.join('temp', p.title[:50]+'.pdf')
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(p.pdf_url, headers=headers, stream=True, timeout=30)
+        response.raise_for_status()
+        
+        with open(filepath, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    file.write(chunk)
+
+        pdfs.append(filepath)
         time.sleep(10)
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
-    return framework.replace('__CONTENT__', content)
+    return framework.replace('__CONTENT__', content), pdfs
 
-def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:int, html:str,):
+def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:int, html:str, pdfs:list[str]):
     def _format_addr(s):
         name, addr = parseaddr(s)
         return formataddr((Header(name, 'utf-8').encode(), addr))
 
-    msg = MIMEText(html, 'html', 'utf-8')
+    msg = MIMEMultipart()
     msg['From'] = _format_addr('Github Action <%s>' % sender)
     msg['To'] = _format_addr('You <%s>' % receiver)
     today = datetime.datetime.now().strftime('%Y/%m/%d')
     msg['Subject'] = Header(f'Daily arXiv {today}', 'utf-8').encode()
+
+    msg.attach(MIMEText(html, 'html', 'utf-8'))
+    for filepath in pdfs:
+        filename = os.path.basename(filepath)
+        
+        with open(filepath, 'rb') as pdf_file:
+            pdf_attachment = MIMEApplication(pdf_file.read(), _subtype="pdf")
+        
+        pdf_attachment.add_header(
+            'Content-Disposition', 
+            'attachment', 
+            filename=filename
+        )
+        msg.attach(pdf_attachment)
 
     try:
         server = smtplib.SMTP(smtp_server, smtp_port)
