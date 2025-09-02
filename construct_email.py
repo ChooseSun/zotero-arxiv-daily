@@ -167,7 +167,7 @@ def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:
         name, addr = parseaddr(s)
         return formataddr((Header(name, 'utf-8').encode(), addr))
 
-    for idx, html, filepath in enumerate(zip(htmls, pdfs)):
+    for idx, (html, filepath) in enumerate(zip(htmls, pdfs)):
         msg = MIMEMultipart()
         msg['From'] = _format_addr('Github Action <%s>' % sender)
         msg['To'] = _format_addr('You <%s>' % receiver)
