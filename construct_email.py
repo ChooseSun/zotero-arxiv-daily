@@ -169,7 +169,7 @@ def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:
 
     for idx, (html, filepath) in enumerate(zip(htmls, pdfs)):
         msg = MIMEMultipart()
-        msg['From'] = _format_addr('Github Action <%s>' % sender)
+        msg['From'] = _format_addr('📖 Github Action <%s>' % sender)
         msg['To'] = _format_addr('You <%s>' % receiver)
         today = datetime.datetime.now().strftime('%Y/%m/%d')
         msg['Subject'] = Header(f'Daily arXiv {today} - Part {idx+1}', 'utf-8').encode()
