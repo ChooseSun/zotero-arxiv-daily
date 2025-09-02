@@ -156,22 +156,26 @@ def render_email(papers:list[ArxivPaper]):
         pdfs.append(filepath)
         time.sleep(10)
 
-    content = '<br>' + '</br><br>'.join(parts) + '</br>'
-    return framework.replace('__CONTENT__', content), pdfs
+    # content = '<br>' + '</br><br>'.join(parts) + '</br>'
+    # return framework.replace('__CONTENT__', content), pdfs
 
-def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:int, html:str, pdfs:list[str]):
+    contents = ['<br>' + part + '</br>' for part in parts]
+    return [framework.replace('__CONTENT__', content) for content in contents], pdfs
+
+def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:int, htmls:list[str], pdfs:list[str]):
     def _format_addr(s):
         name, addr = parseaddr(s)
         return formataddr((Header(name, 'utf-8').encode(), addr))
 
-    msg = MIMEMultipart()
-    msg['From'] = _format_addr('Github Action <%s>' % sender)
-    msg['To'] = _format_addr('You <%s>' % receiver)
-    today = datetime.datetime.now().strftime('%Y/%m/%d')
-    msg['Subject'] = Header(f'Daily arXiv {today}', 'utf-8').encode()
+    for idx, html, filepath in enumerate(zip(htmls, pdfs)):
+        msg = MIMEMultipart()
+        msg['From'] = _format_addr('Github Action <%s>' % sender)
+        msg['To'] = _format_addr('You <%s>' % receiver)
+        today = datetime.datetime.now().strftime('%Y/%m/%d')
+        msg['Subject'] = Header(f'Daily arXiv {today} - Part {idx+1}', 'utf-8').encode()
 
-    msg.attach(MIMEText(html, 'html', 'utf-8'))
-    for filepath in pdfs:
+        msg.attach(MIMEText(html, 'html', 'utf-8'))
+
         filename = os.path.basename(filepath)
         
         with open(filepath, 'rb') as pdf_file:
@@ -184,16 +188,9 @@ def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:
         )
         msg.attach(pdf_attachment)
 
-    try:
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-    except Exception as e:
-        logger.warning(f"Failed to use TLS. {e}")
-        logger.warning(f"Try to use SSL.")
         server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-
-    server.login(sender, password)
-    server.sendmail(sender, [receiver], msg.as_string())
-    server.quit()
+        server.login(sender, password)
+        server.sendmail(sender, [receiver], msg.as_string())
+        server.quit()
 
     os.system('rm temp/*')
