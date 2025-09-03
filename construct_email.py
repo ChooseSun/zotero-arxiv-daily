@@ -118,7 +118,7 @@ def get_stars(score:float):
 def render_email(papers:list[ArxivPaper]):
     parts, pdfs = [], []
     if len(papers) == 0 :
-        return framework.replace('__CONTENT__', get_empty_html())
+        return [framework.replace('__CONTENT__', get_empty_html())], [None]
     
     for p in tqdm(papers,desc='Rendering Email'):
         rate = get_stars(p.score)
@@ -176,17 +176,18 @@ def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:
 
         msg.attach(MIMEText(html, 'html', 'utf-8'))
 
-        filename = os.path.basename(filepath)
-        
-        with open(filepath, 'rb') as pdf_file:
-            pdf_attachment = MIMEApplication(pdf_file.read(), _subtype="pdf")
-        
-        pdf_attachment.add_header(
-            'Content-Disposition', 
-            'attachment', 
-            filename=filename
-        )
-        msg.attach(pdf_attachment)
+        if filepath is not None:
+            filename = os.path.basename(filepath)
+            
+            with open(filepath, 'rb') as pdf_file:
+                pdf_attachment = MIMEApplication(pdf_file.read(), _subtype="pdf")
+            
+            pdf_attachment.add_header(
+                'Content-Disposition', 
+                'attachment', 
+                filename=filename
+            )
+            msg.attach(pdf_attachment)
 
         server = smtplib.SMTP_SSL(smtp_server, smtp_port)
         server.login(sender, password)
