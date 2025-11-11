@@ -170,8 +170,12 @@ if __name__ == '__main__':
     else:
         logger.info("Reranking papers...")
         papers = rerank_paper(papers, corpus)
-        if args.max_paper_num != -1:
-            papers = papers[:args.max_paper_num]
+        for idx, paper in enumerate(papers):
+            if paper.score < 8:
+                break
+        papers = papers[:idx]
+        # if args.max_paper_num != -1:
+        #     papers = papers[:args.max_paper_num]
         if args.use_llm_api:
             logger.info("Using OpenAI API as global LLM.")
             set_global_llm(api_key=args.openai_api_key, base_url=args.openai_api_base, model=args.model_name, lang=args.language)
