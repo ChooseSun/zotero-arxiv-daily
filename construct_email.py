@@ -139,7 +139,7 @@ def render_email(papers:list[ArxivPaper]):
         parts.append(get_block_html(p.title, authors,rate,p.arxiv_id ,p.tldr, p.pdf_url, p.code_url, affiliations))
 
         os.makedirs('temp', exist_ok=True)
-        filepath = os.path.join('temp', p.title[:50]+'.pdf')
+        filepath = os.path.join('temp', p.title[:50]+'...pdf')
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -168,30 +168,45 @@ def send_email(sender:str, receiver:str, password:str,smtp_server:str,smtp_port:
         return formataddr((Header(name, 'utf-8').encode(), addr))
 
     for idx, (html, filepath) in enumerate(zip(htmls, pdfs)):
-        msg = MIMEMultipart()
-        msg['From'] = _format_addr('📖 Github Action <%s>' % sender)
-        msg['To'] = _format_addr('You <%s>' % receiver)
-        today = datetime.datetime.now().strftime('%Y/%m/%d')
-        msg['Subject'] = Header(f'Daily arXiv {today} - Part {idx+1}', 'utf-8').encode()
-
-        msg.attach(MIMEText(html, 'html', 'utf-8'))
-
-        if filepath is not None:
-            filename = os.path.basename(filepath)
-            
-            with open(filepath, 'rb') as pdf_file:
-                pdf_attachment = MIMEApplication(pdf_file.read(), _subtype="pdf")
-            
-            pdf_attachment.add_header(
-                'Content-Disposition', 
-                'attachment', 
-                filename=filename
-            )
-            msg.attach(pdf_attachment)
-
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-        server.login(sender, password)
-        server.sendmail(sender, [receiver], msg.as_string())
-        server.quit()
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = _format_addr('📖 Github Action <%s>' % sender)
+            msg['To'] = _format_addr('You <%s>' % receiver)
+            today = datetime.datetime.now().strftime('%Y/%m/%d')
+            msg['Subject'] = Header(f'Daily arXiv {today} - Part {idx+1} / {len(pdfs)}', 'utf-8').encode()
+    
+            msg.attach(MIMEText(html, 'html', 'utf-8'))
+    
+            if filepath is not None:
+                filename = os.path.basename(filepath)
+                
+                with open(filepath, 'rb') as pdf_file:
+                    pdf_attachment = MIMEApplication(pdf_file.read(), _subtype="pdf")
+                
+                pdf_attachment.add_header(
+                    'Content-Disposition', 
+                    'attachment', 
+                    filename=filename
+                )
+                msg.attach(pdf_attachment)
+      
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+            server.login(sender, password)
+            server.sendmail(sender, [receiver], msg.as_string())
+            server.quit()
+          
+        except:
+            msg = MIMEMultipart()
+            msg['From'] = _format_addr('📖 Github Action <%s>' % sender)
+            msg['To'] = _format_addr('You <%s>' % receiver)
+            today = datetime.datetime.now().strftime('%Y/%m/%d')
+            msg['Subject'] = Header(f'Daily arXiv {today} - Part {idx+1} / {len(pdfs)}', 'utf-8').encode()
+    
+            msg.attach(MIMEText(html, 'html', 'utf-8'))
+  
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+            server.login(sender, password)
+            server.sendmail(sender, [receiver], msg.as_string())
+            server.quit()
 
     os.system('rm temp/*')
